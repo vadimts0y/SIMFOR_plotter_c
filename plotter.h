@@ -5,173 +5,123 @@
 #include <cmath>
 #include <string>
 #include <algorithm>
+#include <memory>
+#include <vector>
+#include <array>
+#include <stdexcept>
+#include "plotter_core.h"
 
 
 // ------------------------------ НАСТРОЙКИ ------------------------------
 
 //ЭКРАН - передаются при инициализации
-static int window_width,          //Ширина
-           window_height;         //Высота
-static double aspect;             //Отношение сторон
+extern int window_width, window_height;         //Высота
+extern double aspect;             //Отношение сторон
 
 
 // ЦВЕТА по умолчанию
-static double color_axis[3];      //Ось
-static double color_text[3];      //Текст
-static double color_array[3];     //Динамический цвет
-static int *color_table;          //Список цветов по умолчанию
-static double *surface_colormap;
+extern double color_axis[3];      //Ось
+extern double color_text[3];      //Текст
+extern double color_array[3];     //Динамический цвет
+extern int *color_table;          //Список цветов по умолчанию
+extern double *surface_colormap;
 
 //Здесь хранятся информация о осях для каждой поверхности
 //- для корректной закраски
-static double **surface_start_end;
+extern double **surface_start_end;
 
 //Флаги освещения
-static bool lighting_activate = false,
-            lighting_deactivate = false,
-			lighting_status = false;
+extern bool lighting_activate, lighting_deactivate, lighting_status;
 
 //Тип окрашивания поверхности
-static bool color_range = true;
+extern bool color_range;
 
 
 //РАЗМЕРЫ
-static double axis_point_size = 1.0;      //Точек оси
-static double axis_line_size = 3.0;       //Ось
-static double net_line_size = 0.5;        //Сетка
+extern double axis_point_size;      //Точек оси
+extern double axis_line_size;       //Ось
+extern double net_line_size;        //Сетка
 
-static double graphic_point_size = 5.0;   //Точек графика
-static double graphic_line_size = 2.0;    //Линий графика
+extern double graphic_point_size;   //Точек графика
+extern double graphic_line_size;    //Линий графика
 
-static double surface_point_size = 5.;    //Поверхность
-static double surface_line_size = 5.0;    //Сеть поверхности
-static double surface_triangle_volume = 0.5; //Толщина поверхности
+extern double surface_point_size;    //Поверхность
+extern double surface_line_size;    //Сеть поверхности
+extern double surface_triangle_volume; //Толщина поверхности
 
-static double axis_text_size = 0.002,     //Размер надписей
-              marks_text_size = 0.001;    //Размер засечек
-static double axis_mark_line_size = 2.0;  //Размер засечек
-static double text_size = 1.0;            //Толщина линии текста
-static double text_point_size = 0.1;      //Размер точек текста
-static double def_text_size_big = 0.0075,
-              def_text_size_normal = 0.005,
-	          def_text_size_small = 0.0025,
-	          def_text_size_very_small = 0.0015;
-static double def_point_size_big = 5.,
-              def_point_size_normal = 2.5,
-	          def_point_size_small = 1.;
-static double def_line_thick = 2.0,
-              def_line_normal = 1.0,
-	          def_line_thin = 0.5;
+extern double axis_text_size, marks_text_size;    //Размер засечек
+extern double axis_mark_line_size;  //Размер засечек
+extern double text_size;            //Толщина линии текста
+extern double text_point_size;      //Размер точек текста
+extern double def_text_size_big, def_text_size_normal, def_text_size_small, def_text_size_very_small;
+extern double def_point_size_big, def_point_size_normal, def_point_size_small;
+extern double def_line_thick, def_line_normal, def_line_thin;
 
 
 
 //ТЕКСТ
-static std::string axis_ox_text = "",   //Ось х  
-                   axis_oy_text = "",   //Ось y
-			       axis_oz_text = "";   //Ось z 
-static std::string *object_name;        //Надписи легенды.
-static std::string color_name;
+extern std::string axis_ox_text, axis_oy_text, axis_oz_text;   //Ось z
+extern std::string *object_name;        //Надписи легенды.
+extern std::string color_name;
 
 
 //ПАРАМЕТРЫ ИЗОБРАЖЕНИЯ
-static bool simplify3d = false;         //Только оси
-static bool legend_need = true;        //Нужна ли легенда?
-static bool net_need = false;           //Отображать сетку?
-static bool mm = false;                 //Миллиметровый режим
-static bool antialiasing = false;       //Сглаживание
-static double zero_x = 0.66;            //С какой позиции идёт легенда - от - 1 до 1
-static bool axis_text_need = true;      //Показ подписей осей
-static double diapason_x_start,         //Начало и конец диапазонов отображения
-              diapason_x_end,   
-              diapason_y_start,
-			  diapason_y_end,
-			  diapason_z_start,
-			  diapason_z_end;
-static bool build_z_marks = false;      //Строить засечки для оси Z ?
-static double diapason_width,           //Ширина
-              diapason_height,          //Высота
-	          diapason_depth;           //Глубина
+extern bool simplify3d;         //Только оси
+extern bool legend_need;        //Нужна ли легенда?
+extern bool net_need;           //Отображать сетку?
+extern bool mm;                 //Миллиметровый режим
+extern bool antialiasing;       //Сглаживание
+extern double zero_x;            //С какой позиции идёт легенда - от - 1 до 1
+extern bool axis_text_need;      //Показ подписей осей
+extern double diapason_x_start, diapason_x_end, diapason_y_start, diapason_y_end, diapason_z_start, diapason_z_end;
+extern bool build_z_marks;      //Строить засечки для оси Z ?
+extern double diapason_width, diapason_height, diapason_depth;           //Глубина
 
 
 //ВЫЧИСЛЕНИЯ (передаются при инициализации в разных видах)
-static int point_number_x,           //Количество точек
-           point_number_y,
-		   point_number_z;
+extern int point_number_x, point_number_y, point_number_z;
 
-static int number_of_sets,           //Число наборов объектов
-           number_of_intervals = 0;  //Число интервалов
-static double step_x = 0.15,          //Шаг по осям
-              step_y = 0.15;
+extern int number_of_sets, number_of_intervals;  //Число интервалов
+extern double step_x, step_y;
 
 
 //ОТОБРАЖЕНИЕ
-static int current_set = 0;          //Текущий отображаемый набор
-static bool all_sets = false;        //Изображать все наборы
-static double x_x_position = 0,      //Относительное позиционирование
-              y_y_position = 0,
-			  z_z_position = 0;
+extern int current_set;          //Текущий отображаемый набор
+extern bool all_sets;        //Изображать все наборы
+extern double x_x_position, y_y_position, z_z_position;
 
 //Рисуем - поверхность?
-static bool is_surface = false;
+extern bool is_surface;
 
 //Тип графика линий
 //1 - точечный
 //2 - линии
 //3 - линии с точками
-static int line_type = 2;
+extern int line_type;
 
 //Тип поверхности
 //1 - точки
 //2 - линии и точки
 //3 - линии
 //4 - поверхность
-static int surface_type = 1;
+extern int surface_type;
 
 
 //КАМЕРА
-static int window_zoom = 0,
-           x_shift = 0,       //Смещение по осям
-		   y_shift = 0,
-		   z_shift = 0;
-static int add_x_canvas = 0,  //Пределы изображения по осям
-           add_y_canvas = 0,
-		   add_z_canvas = 0;
-static double factor = 1,     //Приближение/Удаление от точки
-              new_factor = 1;
-static double x_degree = 0,   //Вращение
-              y_degree = 0,
-			  z_degree = 0;
+extern int window_zoom, x_shift, y_shift, z_shift;
+extern int add_x_canvas, add_y_canvas, add_z_canvas;
+extern double factor, new_factor;
+extern double x_degree, y_degree, z_degree;
 
 
-static double *surface_tesseract;
-static double(**input_f)(double);
+extern double *surface_tesseract;
+extern double(**input_f)(double);
 
 // -------------------------------------------------------------------------------
 
 
-class Point
-{
-public:
-	bool valid;
-	double x, y, z;
-	double static_color[3];
-	double dynamic_color[3];
-
-	Point()
-	{
-		valid = true;
-		x = 0;
-		y = 0;
-		z = 0;
-		for (int i = 0; i < 3; i++)
-		{
-			static_color[i] = 0;
-			dynamic_color[i] = 0;
-		}
-	}
-	
-};
-static Point *points_array;
+using Point = plotter_core::Point;
+extern Point *points_array;
 
 
 class bound
@@ -200,7 +150,7 @@ public:
 		return temp < 0.00000001;
 	}
 };
-static bound **exclusion_intervals;
+extern bound **exclusion_intervals;
 
 
 bool bounds_check(bound interval, double evalue, int coord);
@@ -211,21 +161,22 @@ bool nan_check(double evalue);
 class Graphic
 {
 public:
+	std::unique_ptr<Point[]> points_storage;
 	Point *points;
 	double(*fun_y)(double);
 	double(*fun_z)(double);
 	
 	Graphic(double(*new_fun)(double))
+		: points_storage(new Point[point_number_x + 1]), points(points_storage.get())
 	{
 		fun_y = new_fun;
 		fun_z = new_fun;
-		points = new Point[point_number_x + 1];
 		Comp();
 	}
 
 	Graphic()
+		: points_storage(new Point[point_number_x + 1]), points(points_storage.get())
 	{
-		points = new Point[point_number_x + 1];
 		fun_y = nullptr;
 		fun_z = nullptr;
 	}
@@ -233,53 +184,29 @@ public:
 	//Расчёт точек поверхности
 	void Comp()
 	{
-		for (int i = 0; i < point_number_x; i++)
+		std::vector<plotter_core::ExclusionInterval> exclusions;
+		if (number_of_intervals < 0)
+			throw std::invalid_argument("Number of exclusion intervals must not be negative");
+		if (number_of_intervals > 0)
 		{
-			bool skip = false;
-			points[i].x = 0;
-			points[i].y = 0;
-			points[i].z = 0;
-
-			double temp = diapason_x_start + step_x*i;
-			
-			for (int k = 0; k < number_of_intervals; k++)
-				if (bounds_check(exclusion_intervals[current_set][k], temp, 0))
-					skip = true;
-			
-			if (infinity_check(temp) || nan_check(temp))
-				skip = true;
-
-			if (skip == false)
+			if (exclusion_intervals == nullptr || exclusion_intervals[current_set] == nullptr)
+				throw std::invalid_argument("Exclusion interval data must not be null");
+			for (int i = 0; i < number_of_intervals; ++i)
 			{
-				points[i].x = temp;
-				temp = fun_y(points[i].x);
-				for (int k = 0; k < number_of_intervals; k++)
-					if (bounds_check(exclusion_intervals[current_set][k], temp, 1))
-						skip = true;
-				if (infinity_check(temp) || nan_check(temp))
-					skip = true;
-
+				const bound &interval = exclusion_intervals[current_set][i];
+				plotter_core::ExclusionInterval converted = {
+					{interval.left.x, interval.left.y, interval.left.z},
+					{interval.right.x, interval.right.y, interval.right.z}
+				};
+				exclusions.push_back(converted);
 			}
-			if (skip == false)
-			{
-				points[i].y = temp;
-				if (fun_z != nullptr)
-				{
-					temp = fun_z(points[i].x);
-					for (int k = 0; k < number_of_intervals; k++)
-						if (bounds_check(exclusion_intervals[current_set][k], temp, 2))
-							skip = true;
-					if (infinity_check(temp) || nan_check(temp))
-						skip = true;
-					points[i].z = temp;
-				}
-			}
-
-			if (skip != false)	points[i].valid = false;
 		}
+		const std::vector<Point> samples = plotter_core::sample_function(
+			diapason_x_start, step_x, point_number_x, fun_y, fun_z, exclusions);
+		std::copy(samples.begin(), samples.end(), points);
 	}
 };
-static Graphic *function_array;
+extern Graphic *function_array;
 
 
 class Surface
@@ -287,68 +214,51 @@ class Surface
 public:
 	//Поверхность
 	double(*fun_surface)(double, double);
-	
+	std::unique_ptr<Point[]> point_storage;
+	std::vector<Point*> point_rows;
 	Point **point;
 	
 	double surface_start, surface_end;
 	
 	Surface(double(*new_f)(double, double))
+		: point_storage(new Point[static_cast<std::size_t>(point_number_x) * static_cast<std::size_t>(point_number_y)]),
+		  point_rows(point_number_x), point(point_rows.data())
 	{
 		fun_surface = new_f;
-		point = new Point*[point_number_x];
 		for (int i = 0; i < point_number_x; i++)
-			point[i] = new Point[point_number_y];
+			point_rows[i] = point_storage.get() + i * point_number_y;
 
 	}
 
 	Surface()
+		: point_storage(new Point[static_cast<std::size_t>(point_number_x) * static_cast<std::size_t>(point_number_y)]()),
+		  point_rows(point_number_x), point(point_rows.data())
 	{
-		point = new Point*[point_number_x];
 		for (int i = 0; i < point_number_x; i++)
-			point[i] = new Point[point_number_y]();
+			point_rows[i] = point_storage.get() + i * point_number_y;
 		fun_surface = nullptr;
 	}
 
 	void compute_surface()
 	{
-		surface_tesseract = new double[number_of_sets];
+		const plotter_core::SurfaceSamples samples = plotter_core::sample_surface(
+			diapason_x_start, diapason_y_start, step_x, step_y,
+			point_number_x, point_number_y, fun_surface);
+		for (int i = 0; i < point_number_x; ++i)
+			std::copy(samples.points.begin() + static_cast<std::size_t>(i) * point_number_y,
+			          samples.points.begin() + static_cast<std::size_t>(i + 1) * point_number_y,
+			          point[i]);
 
-		double min_v = 1000000;
-		double max_v = -1000000;
+		surface_start = samples.minimum;
+		surface_end = samples.maximum;
 
-		for (int i = 0; i < point_number_x; i++)
-			for (int j = 0; j < point_number_y; j++)
-			{
-				point[i][j].x = diapason_x_start + step_x*j;
-				point[i][j].y = diapason_y_start + step_y*i;
-				
-				double temp = fun_surface(point[i][j].x, point[i][j].y);
-				
-				if (infinity_check(temp) || nan_check(temp))
-				{
-					point[i][j].z = 0;
-					point[i][j].valid = true;
-				}
-				else
-				{
-					point[i][j].z = -1.*temp;
-					if (temp > max_v)
-						max_v = temp;
-					if (temp < min_v)
-						min_v = temp;
-				}
-			}
-
-		surface_start = min_v;
-		surface_end = max_v;
-
-		diapason_z_start = std::min(min_v, diapason_z_start);
+		diapason_z_start = std::min(samples.minimum, diapason_z_start);
 		diapason_z_start = floor(diapason_z_start);
-		diapason_z_end = std::max(max_v, diapason_z_end);
+		diapason_z_end = std::max(samples.maximum, diapason_z_end);
 		diapason_z_end = ceil(diapason_z_end);
 	}
 };
-static Surface *surf_array;
+extern Surface *surf_array;
 
 
 //Вращение, смещение, факторизация
@@ -443,6 +353,8 @@ void OpenGL();
 
 
 //Инициализация наборов точек
+void initialization_points(const std::vector<std::vector<plotter_core::Coordinates>> &point_sets);
+// Совместимый интерфейс: ось -> точка -> набор.
 void initialization_p_many(double ***i_points_xyz, int i_point_number_x, int i_axis_number, int i_sets_number);
 
 
@@ -479,5 +391,6 @@ void tenth_mode(bool flag);                 // Режим миллиметра
 
 // Легенда
 void Set_Legend_Text(std::string* new_text); // Текст легенды
+void Set_Legend_Text(std::string* new_text, int text_count);
 void Set_Legend_Start_Pos_X(double posit);   // Позиция легенды
 void Show_Legend(bool flag);                 // Показать легенду?

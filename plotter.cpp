@@ -1,4 +1,122 @@
 #include "plotter.h"
+#include <limits>
+#include <stdexcept>
+
+// Единственное общее состояние библиотеки.
+int window_width,
+           window_height;
+double aspect;
+double color_axis[3];
+double color_text[3];
+double color_array[3];
+int *color_table;
+double *surface_colormap;
+double **surface_start_end;
+bool lighting_activate = false,
+            lighting_deactivate = false,
+			lighting_status = false;
+bool color_range = true;
+double axis_point_size = 1.0;
+double axis_line_size = 3.0;
+double net_line_size = 0.5;
+double graphic_point_size = 5.0;
+double graphic_line_size = 2.0;
+double surface_point_size = 5.;
+double surface_line_size = 5.0;
+double surface_triangle_volume = 0.5;
+double axis_text_size = 0.002,
+              marks_text_size = 0.001;
+double axis_mark_line_size = 2.0;
+double text_size = 1.0;
+double text_point_size = 0.1;
+double def_text_size_big = 0.0075,
+              def_text_size_normal = 0.005,
+	          def_text_size_small = 0.0025,
+	          def_text_size_very_small = 0.0015;
+double def_point_size_big = 5.,
+              def_point_size_normal = 2.5,
+	          def_point_size_small = 1.;
+double def_line_thick = 2.0,
+              def_line_normal = 1.0,
+	          def_line_thin = 0.5;
+std::string axis_ox_text = "",
+                   axis_oy_text = "",
+			       axis_oz_text = "";
+std::string *object_name;
+std::string color_name;
+bool simplify3d = false;
+bool legend_need = true;
+bool net_need = false;
+bool mm = false;
+bool antialiasing = false;
+double zero_x = 0.66;
+bool axis_text_need = true;
+double diapason_x_start,
+              diapason_x_end,
+              diapason_y_start,
+			  diapason_y_end,
+			  diapason_z_start,
+			  diapason_z_end;
+bool build_z_marks = false;
+double diapason_width,
+              diapason_height,
+	          diapason_depth;
+int point_number_x,
+           point_number_y,
+		   point_number_z;
+int number_of_sets,
+           number_of_intervals = 0;
+double step_x = 0.15,
+              step_y = 0.15;
+int current_set = 0;
+bool all_sets = false;
+double x_x_position = 0,
+              y_y_position = 0,
+			  z_z_position = 0;
+bool is_surface = false;
+int line_type = 2;
+int surface_type = 1;
+int window_zoom = 0,
+           x_shift = 0,
+		   y_shift = 0,
+		   z_shift = 0;
+int add_x_canvas = 0,
+           add_y_canvas = 0,
+		   add_z_canvas = 0;
+double factor = 1,
+              new_factor = 1;
+double x_degree = 0,
+              y_degree = 0,
+			  z_degree = 0;
+double *surface_tesseract;
+double(**input_f)(double);
+Point *points_array;
+bound **exclusion_intervals;
+Graphic *function_array;
+Surface *surf_array;
+
+namespace
+{
+std::array<int, 10> color_table_storage;
+std::vector<std::string> default_object_names;
+std::vector<double> surface_tesseract_storage;
+std::unique_ptr<Graphic[]> function_array_storage;
+std::unique_ptr<Surface[]> surf_array_storage;
+int object_name_count = -1;
+
+int checked_sample_count(double start, double end, double step, const char *axis)
+{
+	return plotter_core::sample_count(start, end, step, axis);
+}
+
+void check_legend_count(int set_count)
+{
+	if (object_name != nullptr && object_name_count >= 0 && object_name_count < set_count)
+		throw std::invalid_argument("Legend has fewer labels than plotted sets");
+}
+}
+
+
 
 
 // Проверка: находится ли число между диапазонами.
@@ -313,7 +431,7 @@ void initialization_general(int i_window_width, int i_window_height)
 	color_axis[2] = color_array[2];
 
 	//Таблица цвета графиков по умолчанию
-	color_table = new int[10];
+	color_table = color_table_storage.data();
 	color_table[0] = 5;  //Red
 	color_table[1] = 6;  //Lime
 	color_table[2] = 15; //Navy
@@ -335,12 +453,14 @@ void initialization_general(int i_window_width, int i_window_height)
 	// Если легенда не задана пользователем
 	if (object_name == nullptr)
 	{
-		object_name = new std::string[25];
+		default_object_names.resize(25);
 		for (int i = 0; i < 25; i++)
 		{
-			object_name[i] = "Object N" + std::to_string(i + 1);
+			default_object_names[i] = "Object N" + std::to_string(i + 1);
 
 		}
+		object_name = default_object_names.data();
+		object_name_count = static_cast<int>(default_object_names.size());
 	}
 
 }
@@ -566,12 +686,15 @@ void draw_legend()
 		to_set = number_of_sets;
 	}
 
-	glPushMatrix();
-	
+	// Рисуем легенду в экранных координатах, сохраняя обе матрицы сцены.
+	// Иначе identity-проекция остаётся активной и следующий draw() отображает
+	// график с другим масштабом.
 	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
 	glLoadIdentity();
-	
+
 	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
 	glLoadIdentity();
 	
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -615,7 +738,11 @@ void draw_legend()
 		draw_string_stroke(object_name[s]);
 		glPopMatrix();
 	}
+	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
 }
 
 /*
@@ -836,10 +963,18 @@ void initialization_bounds()
 void initialization_function(double i_diapason_x_start, double i_diapason_x_end,
                              double(**i_functions)(double), int i_functions_number)
 {
-	point_number_x = (i_diapason_x_end - i_diapason_x_start) / step_x + 1;
+	if (i_functions_number <= 0 || i_functions == nullptr)
+		throw std::invalid_argument("At least one function is required");
+	for (int i = 0; i < i_functions_number; ++i)
+		if (i_functions[i] == nullptr)
+			throw std::invalid_argument("Function pointer must not be null");
+	const int sample_count = checked_sample_count(i_diapason_x_start, i_diapason_x_end, step_x, "X");
+	check_legend_count(i_functions_number);
+	point_number_x = sample_count;
 	number_of_sets = i_functions_number;
 	
-	function_array = new Graphic[number_of_sets];
+	function_array_storage.reset(new Graphic[number_of_sets]);
+	function_array = function_array_storage.get();
 	
 	diapason_x_start = i_diapason_x_start;
 	diapason_x_end = i_diapason_x_end;
@@ -861,8 +996,19 @@ void initialization_surface(double i_diapason_x_start, double i_diapason_x_end,
                             double i_diapason_y_start, double i_diapason_y_end,
 							double(**i_surface_functions)(double, double), int i_surface_number)
 {
-	point_number_x = (i_diapason_x_end - i_diapason_x_start) / step_x + 1;
-	point_number_y = (i_diapason_y_end - i_diapason_y_start) / step_y + 1;
+	if (i_surface_number <= 0 || i_surface_functions == nullptr)
+		throw std::invalid_argument("At least one surface function is required");
+	for (int i = 0; i < i_surface_number; ++i)
+		if (i_surface_functions[i] == nullptr)
+			throw std::invalid_argument("Surface function pointer must not be null");
+	const int x_sample_count = checked_sample_count(i_diapason_x_start, i_diapason_x_end, step_x, "X");
+	const int y_sample_count = checked_sample_count(i_diapason_y_start, i_diapason_y_end, step_y, "Y");
+	if (static_cast<std::size_t>(x_sample_count) >
+	    std::numeric_limits<std::size_t>::max() / static_cast<std::size_t>(y_sample_count) / sizeof(Point))
+		throw std::invalid_argument("Surface grid is too large");
+	check_legend_count(i_surface_number);
+	point_number_x = x_sample_count;
+	point_number_y = y_sample_count;
 
 	number_of_sets = i_surface_number;
 
@@ -874,7 +1020,10 @@ void initialization_surface(double i_diapason_x_start, double i_diapason_x_end,
 	diapason_y_end = i_diapason_y_end;
 	y_y_position = i_diapason_y_end;
 
-	surf_array = new Surface[number_of_sets];
+	surf_array_storage.reset(new Surface[number_of_sets]);
+	surf_array = surf_array_storage.get();
+	surface_tesseract_storage.resize(number_of_sets);
+	surface_tesseract = surface_tesseract_storage.data();
 	for (int i = 0; i < number_of_sets; i++)
 	{
 		current_set = i;
@@ -1368,29 +1517,72 @@ void OpenGL()
 }
 
 
-// Инициализация наборов точек
-void initialization_p_many(double ***i_points_xyz, int i_point_number_x,
-                           int i_axis_number, int i_sets_number)
+// Инициализация наборов точек из типизированных координат.
+void initialization_points(const std::vector<std::vector<plotter_core::Coordinates>> &point_sets)
 {
-	int arr_size = i_axis_number;
-	point_number_x = i_point_number_x;
-	number_of_sets = i_sets_number;
+	if (point_sets.empty() || point_sets.front().empty() ||
+	    point_sets.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+	    point_sets.front().size() > static_cast<std::size_t>(std::numeric_limits<int>::max() - 1))
+		throw std::invalid_argument("Point data requires at least one set and one point");
+	const std::size_t point_count = point_sets.front().size();
+	for (const auto &set : point_sets)
+	{
+		if (set.size() != point_count)
+			throw std::invalid_argument("All point sets must contain the same number of points");
+		for (const auto &coordinates : set)
+			if (!std::isfinite(coordinates.x) || !std::isfinite(coordinates.y) ||
+			    !std::isfinite(coordinates.z))
+				throw std::invalid_argument("Point coordinates must be finite");
+	}
+	check_legend_count(static_cast<int>(point_sets.size()));
+	point_number_x = static_cast<int>(point_count);
+	number_of_sets = static_cast<int>(point_sets.size());
 
-	function_array = new Graphic[number_of_sets];
+	function_array_storage.reset(new Graphic[number_of_sets]);
+	function_array = function_array_storage.get();
 
 	for (int i = 0; i < number_of_sets; i++)
 		for (int j = 0; j < point_number_x; j++)
 		{
-			function_array[i].points[j].x = i_points_xyz[0][j][i];
-			function_array[i].points[j].y = i_points_xyz[1][j][i];
-			if (arr_size == 3)
-				function_array[i].points[j].z = i_points_xyz[2][j][i];
-			else
-				function_array[i].points[j].z = 0;
+			const plotter_core::Coordinates &coordinates = point_sets[static_cast<std::size_t>(i)][static_cast<std::size_t>(j)];
+			function_array[i].points[j].x = coordinates.x;
+			function_array[i].points[j].y = coordinates.y;
+			function_array[i].points[j].z = coordinates.z;
 		}
 
+	current_set = 0;
 	initialization_bounds();
 	set_bounds();
+}
+
+// Совместимая обёртка для старого формата: ось -> точка -> набор.
+void initialization_p_many(double ***i_points_xyz, int i_point_number_x,
+                           int i_axis_number, int i_sets_number)
+{
+	if (i_points_xyz == nullptr || i_point_number_x <= 0 || i_sets_number <= 0 ||
+	    (i_axis_number != 2 && i_axis_number != 3))
+		throw std::invalid_argument("Point data requires positive point/set counts and 2 or 3 axes");
+	if (i_points_xyz[0] == nullptr || i_points_xyz[1] == nullptr ||
+	    (i_axis_number == 3 && i_points_xyz[2] == nullptr))
+		throw std::invalid_argument("Point coordinate arrays must not be null");
+
+	std::vector<std::vector<plotter_core::Coordinates>> point_sets(
+		static_cast<std::size_t>(i_sets_number),
+		std::vector<plotter_core::Coordinates>(static_cast<std::size_t>(i_point_number_x)));
+	for (int j = 0; j < i_point_number_x; ++j)
+	{
+		if (i_points_xyz[0][j] == nullptr || i_points_xyz[1][j] == nullptr ||
+		    (i_axis_number == 3 && i_points_xyz[2][j] == nullptr))
+			throw std::invalid_argument("Point coordinate rows must not be null");
+		for (int i = 0; i < i_sets_number; ++i)
+		{
+			auto &coordinates = point_sets[static_cast<std::size_t>(i)][static_cast<std::size_t>(j)];
+			coordinates.x = i_points_xyz[0][j][i];
+			coordinates.y = i_points_xyz[1][j][i];
+			coordinates.z = i_axis_number == 3 ? i_points_xyz[2][j][i] : 0.;
+		}
+	}
+	initialization_points(point_sets);
 }
 
 
@@ -1445,10 +1637,14 @@ void surface_mode(bool new_mode)
 }
 void Set_Step_X(double new_step)           //Шаг по оси x
 {
+	if (!std::isfinite(new_step) || new_step <= 0.)
+		throw std::invalid_argument("Step for X must be finite and positive");
 	step_x = new_step;
 }
 void Set_Step_Y(double new_step)           //Шаг по оси y
 {
+	if (!std::isfinite(new_step) || new_step <= 0.)
+		throw std::invalid_argument("Step for Y must be finite and positive");
 	step_y = new_step;
 }
 void Set_Graphic_Line_Size(double new_size)
@@ -1490,7 +1686,19 @@ void tenth_mode(bool flag)                 //Режим миллиметра
 // Легенда
 void Set_Legend_Text(std::string* new_text) //Текст легенды
 {
+	if (new_text == nullptr)
+		throw std::invalid_argument("Legend text must not be null");
 	object_name = new_text;
+	object_name_count = -1;
+}
+void Set_Legend_Text(std::string* new_text, int text_count)
+{
+	if (new_text == nullptr || text_count <= 0)
+		throw std::invalid_argument("Legend requires a non-null array and positive label count");
+	if (number_of_sets > 0 && text_count < number_of_sets)
+		throw std::invalid_argument("Legend has fewer labels than plotted sets");
+	object_name = new_text;
+	object_name_count = text_count;
 }
 void Set_Legend_Start_Pos_X(double posit)
 {
