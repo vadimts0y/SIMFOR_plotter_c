@@ -9,17 +9,23 @@ using namespace std;
 
 double sine(double x)
 {
-    return sin(x);
+    return sin(x + 3.14/4);
 }
 
 double cosine(double x)
 {
-    return cos(x);
+    return cos(x - 2*3.14);
 }
 
 double x2(double x)
 {
-	return x*x;
+	return (x-1)*(x-1) + 2;
+}
+
+// TODO отдельно рассмотреть подобные случаи
+double hyperbole(double x)
+{
+    return 1/x;
 }
 
 
@@ -41,27 +47,28 @@ int main(int argc, char** argv)
 
     // График
     //surface_mode(true);
-    //Set_Step_X(1);                  //Работает           
+    Set_Step_X(0.6);                  //Работает           
     //Set_Step_Y(1);                  //Работает
-    //Set_Graphic_Line_Size(6.);      //Работает
-    //Set_Graphic_Point_Size(24.);    //Работает
+    Set_Graphic_Line_Size(6.);      //Работает
+    Set_Graphic_Point_Size(10.);    //Работает
 
     //Сетка
-    //Set_Net(true);                  //Работает                   
+    Set_Net(true);                  //Работает                   
     //Set_Net_Line_Size(10);          //Работает
-    //tenth_mode(true);               //Работает  
+    tenth_mode(true);               //Работает  
 
-    //Set_Legend_Start_Pos_X(-0.01);  
-    Show_Legend(false);              // TODO Баг с масштабированием
+    Set_Legend_Start_Pos_X(0.6);  
+    Show_Legend(false);              //Работает
 
     glutInit(&argc, argv); // Инициализация FreeGLUT             
 	
     // Легенда
-    std::string legend_text[3];
-	legend_text[0] = "sin x";
-	legend_text[1] = "cos x";
-    legend_text[2] = "x^2";
-    Set_Legend_Text(legend_text);    
+    std::string legend_text[4];
+	legend_text[0] = "sin (x + Pi/4)";
+	legend_text[1] = "cos (x - 2*Pi)";
+    legend_text[2] = "(x-1)^2 + 2";
+    //legend_text[2] = "1/x";
+    Set_Legend_Text(legend_text, 3);
 
     // Размер окна
     initialization_general(800, 800);
@@ -76,9 +83,10 @@ int main(int argc, char** argv)
 	initialization_function(-5, 5, functions_arr, 1);
 	initialization_function(-5, 5, functions_arr, 2);
     initialization_function(-5, 5, functions_arr, 3);
+    //initialization_function(-5, 5, functions_arr, 4);
 
     //Набор точек
-    int n = 5;
+    /*int n = 5;
 	double*** points = new double**[2];
     
 	for (int i = 0; i < 2; i++)
@@ -87,7 +95,7 @@ int main(int argc, char** argv)
         for (int j = 0; j < n; j++) {
             points[i][j] = new double[2];
         }
-    }
+    }*/
 
     OpenGL();
 

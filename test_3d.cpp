@@ -10,18 +10,18 @@ using namespace std;
 // Гиперболический параболоид (седло)
 double f1(double x, double y)
 {
-    return (x*x/4 - y*y/4);
+    return (x*x/0.9 - y*y/0.9);
 }
 
 // эллиптический параболоид
 double f2(double x, double y)
 {
-    return (x*x/4 + y*y/4);
+    return (x*x/0.9 + y*y/0.9);
 }
 
 double f3(double x, double y)
 {
-    return sqrt(2 + x*x/2 + y*y/2);
+    return sqrt(x*x/0.9 + y*y/0.9);
 }
 
 
@@ -53,26 +53,30 @@ int main(int argc, char** argv)
     //Set_Net_Line_Size(10);          //Работает
     //tenth_mode(true);               //Работает  
 
-    //Set_Legend_Start_Pos_X(-0.01);  
-    Show_Legend(false);              //Баг с масштабированием
+    Set_Surface_Line_Size(2);         //Работает
+    Set_Surface_Point_Size(1);        //???
+    Set_Surface_Width(40);            //???
+
+    Set_Legend_Start_Pos_X(-0.02);  
+    Show_Legend(false);              //Работает
 
     glutInit(&argc, argv); // Инициализация FreeGLUT             
 	
     // Легенда
     std::string legend_text[3];
-	legend_text[0] = "Object N1";
-	legend_text[1] = "cos x";
-    legend_text[2] = "x^2";
-    Set_Legend_Text(legend_text);    
+	legend_text[0] = "x^2/0.9 - y^2/0.9";
+	legend_text[1] = "x^2/0.9 + y^2/0.9";
+    legend_text[2] = "sqrt(x^2/0.9 + y^2/0.9)";
+    Set_Legend_Text(legend_text, 3);
 
     // Размер окна
     initialization_general(800, 800);
 
     double (*surface_functions[3])(double, double) = {f1, f2, f3};
 
-    initialization_surface(-6, 6, -6, 6, surface_functions, 1);
-    initialization_surface(-6, 6, -6, 6, surface_functions, 2);
-    initialization_surface(-6, 6, -6, 6, surface_functions, 3);   
+    initialization_surface(-2, 2, -2, 2, surface_functions, 1);
+    initialization_surface(-2, 2, -2, 2, surface_functions, 2);
+    initialization_surface(-2, 2, -2, 2, surface_functions, 3);   
 
     OpenGL();
 

@@ -36,51 +36,35 @@ int main(int argc, char** argv)
     //tenth_mode(true);               //Работает  
 
     //Set_Legend_Start_Pos_X(-0.01);  
-    Show_Legend(false);              //Баг с масштабированием
+    Show_Legend(false);              //Работает
 
     glutInit(&argc, argv); // Инициализация FreeGLUT             
 	
     // Легенда
-    std::string legend_text[1];
-	legend_text[0] = "points";
-    Set_Legend_Text(legend_text);    
+    std::vector<std::string> legend_text = {"points1", "points2"};
+    Set_Legend_Text(legend_text.data(), static_cast<int>(legend_text.size()));
 
     // Размер окна
     initialization_general(800, 800);
 
-    //Набор точек
-    int n = 5;
-	double*** points = new double**[2];
-    
-	for (int i = 0; i < 2; i++)
-	{
-        points[i] = new double*[n];
-        for (int j = 0; j < n; j++) {
-            points[i][j] = new double[2];
+    // Наборы точек: внешний вектор задаёт набор, внутренний — его точки.
+    std::vector<std::vector<plotter_core::Coordinates>> points = {
+        {
+            {-4.5, 0.0, 0.0}, {-4.0, 1.5, 0.0}, {-3.6, -3.0, 0.0},
+            {-3.2, 1.7, 0.0}, {-2.9, 2.2, 0.0}, {-2.3, -0.5, 0.0},
+            {0.0, 4.5, 0.0}, {1.5, 3.0, 0.0}, {3.9, 3.0, 0.0}, {4.9, 2.2, 0.0}
+        },
+        {
+            {-5.0, 0.01, 0.0}, {-4.0, 0.9, 0.0}, {-3.0, 2.0, 0.0},
+            {-2.0, 0.0, 0.0}, {-1.0, 4.0, 0.0}, {0.0, 3.0, 0.0},
+            {1.0, 2.5, 0.0}, {2.0, 1.0, 0.0}, {3.0, -1.2, 0.0}, {4.0, 2.2, 0.0}
         }
-    }
+    };
 
-	// Первый индекс - ось (0 - x, 1 - y, 2 - z)
-	// Второй индекс - номер точки
-	// Третий индекс - номер набора
-	points[0][0][0] = -3.2;
-	points[0][1][0] = -2.3;
-	points[0][2][0] = -0.6;
-	points[0][3][0] = 1.7;
-	points[0][4][0] = 3.3;
-
-	points[1][0][0] = 2;
-	points[1][1][0] = 3.5;
-	points[1][2][0] = 3;
-	points[1][3][0] = 1.7;
-	points[1][4][0] = 2.2;
-
-    Set_Graphic_Point_Size(10);
+    Set_Graphic_Point_Size(15);
     color_select("Blue");
 
-    // Сейчас нельзя переключаться между набором точек и наборо функций
-    // TODO Добавить переключение между набором точек и функций
-	initialization_p_many(points, n, 2, 1); 
+	initialization_points(points);
 
     OpenGL();
 
